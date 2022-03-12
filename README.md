@@ -1,2 +1,4 @@
 # csv_madness
-Assignment 3 - COMP 249
+COMP 249 - Assignment #3
+Due Date: March 20th
+Written by: Augusto Mota Pinheiro (40208080) Michaël Gugliandolo (40213419)
