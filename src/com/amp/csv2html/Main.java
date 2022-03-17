@@ -15,9 +15,14 @@ public class Main {
     public static void main(String[] args) {
         Scanner covidStatsScanner = null;
         Scanner doctorListScanner = null;
+
         FileWriter exceptionsWriter = null;
         FileWriter covidStatsWriter = null;
         FileWriter doctorListWriter = null;
+
+        File exceptionsFile = null;
+        File covidFile = null;
+        File doctorFile = null;
 
         try {
             covidStatsScanner = new Scanner(new File("input/covidStatistics.csv"));
@@ -40,13 +45,10 @@ public class Main {
         }
         //Both files have been opened successfully
 
-        File exceptions = null;
-        File covid = null;
-        File doctor = null;
 
         try {
-            exceptions = new File("output/Exceptions.log");
-            exceptionsWriter = new FileWriter(exceptions, true);
+            exceptionsFile = new File("output/Exceptions.log");
+            exceptionsWriter = new FileWriter(exceptionsFile, true);
         } catch (IOException e) {
             System.out.println("Could not open nor create file Exceptions.log for writing.");
 
@@ -54,7 +56,7 @@ public class Main {
 
             System.out.println("This program will delete Exceptions.log from the \"output\" folder.");
 
-            if (exceptions.delete()) System.out.println("Deletion successful.");
+            if (exceptionsFile.delete()) System.out.println("Deletion successful.");
 
             covidStatsScanner.close();
             doctorListScanner.close();
@@ -63,8 +65,8 @@ public class Main {
         }
 
         try {
-            covid = new File("output/covidStatistics.html");
-            covidStatsWriter = new FileWriter(covid);
+            covidFile = new File("output/covidStatistics.html");
+            covidStatsWriter = new FileWriter(covidFile);
         } catch (IOException e) {
             System.out.println("Could not open file covidStatistics.html for writing.");
 
@@ -72,7 +74,7 @@ public class Main {
 
             System.out.println("This program will delete Exceptions.log and covidStatistics.html from the \"output\" folder.");
 
-            if (exceptions.delete() && covid.delete()) System.out.println("Deletion successful.");
+            if (exceptionsFile.delete() && covidFile.delete()) System.out.println("Deletion successful.");
 
             covidStatsScanner.close();
             doctorListScanner.close();
@@ -80,8 +82,8 @@ public class Main {
             System.exit(-1);
         }
         try {
-            doctor = new File("output/doctorList.html");
-            doctorListWriter = new FileWriter(doctor);
+            doctorFile = new File("output/doctorList.html");
+            doctorListWriter = new FileWriter(doctorFile);
         } catch (IOException e) {
             System.out.println("Could not open file doctorList.html for writing.");
 
@@ -89,7 +91,7 @@ public class Main {
 
             System.out.println("This program will delete Exceptions.log, covidStatistics.html and doctorList.html from the \"output\" folder.");
 
-            if (exceptions.delete() && covid.delete() && doctor.delete()) System.out.println("Deletion successful.");
+            if (exceptionsFile.delete() && covidFile.delete() && doctorFile.delete()) System.out.println("Deletion successful.");
 
             covidStatsScanner.close();
             doctorListScanner.close();
@@ -98,22 +100,34 @@ public class Main {
         }
         //All 3 files to be written to have been created or opened successfully
 
-        String dataMissingExceptions;
         try {
-            dataMissingExceptions = ConvertCSVtoHTML(covidStatsScanner, covidStatsWriter, "covidStatistics.csv");
+            ConvertCSVtoHTML(covidStatsScanner, covidStatsWriter, exceptionsWriter, "covidStatistics.csv");
         } catch (CSVAttributeMissing e) {
+            if (covidFile.delete()) System.out.println("covidStatistics.html deletion successful.");
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            covidStatsScanner.close();
         }
         try {
-            dataMissingExceptions = ConvertCSVtoHTML(doctorListScanner, doctorListWriter, "doctorList.csv");
+            ConvertCSVtoHTML(doctorListScanner, doctorListWriter, exceptionsWriter, "doctorList.csv");
         } catch (CSVAttributeMissing e) {
+            if (doctorFile.delete()) System.out.println("doctorList.csv deletion successful.");
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
+        } finally {
+            doctorListScanner.close();
         }
 
+        try {
+            exceptionsWriter.close();
+        } catch (IOException e) {
+            System.out.println("There was an IOException when closing the file writer for Exceptions.log");
+            e.printStackTrace();
+        }
+        //todo when we prompt user to enter name of file, if he enters Bob Ross!, we attempt to open a file on his default browser?
     }
 
     /**
@@ -150,7 +164,7 @@ public class Main {
         }
     }
 
-    private static String ConvertCSVtoHTML(Scanner fileReader, FileWriter fileWriter, String fileName) throws CSVAttributeMissing, IOException {
+    private static void ConvertCSVtoHTML(Scanner fileReader, FileWriter fileWriter, FileWriter exceptionsWriter, String fileName) throws CSVAttributeMissing, IOException {
 
         fileWriter.write("""
                 <!DOCTYPE html>
@@ -169,15 +183,14 @@ public class Main {
 
         String[] line = fileReader.nextLine().split(",");
         String[] attributes;
-        StringBuilder dataMissingExceptions = new StringBuilder(); //Contains all the missing data exceptions that will be added to Exceptions.log
         int lineCounter = 1;
 
-        fileWriter.write("<caption>" + line[0] + "</caption>");
+        fileWriter.write("<caption>" + line[0] + "</caption>\n");
 
         attributes = fileReader.nextLine().split(",");
         lineCounter++;
 
-        writeAttributes(fileWriter, attributes, fileName);
+        writeAttributes(fileWriter, exceptionsWriter, attributes, fileName);
 
 
         while (fileReader.hasNextLine()) {
@@ -191,11 +204,12 @@ public class Main {
                 try {
                     verifyDataRow(line);
                 } catch (CSVDataMissing e) {
-                    dataMissingExceptions.append("Missing data in \"").append(fileName).append("\" for attribute \"").append(attributes[Integer.parseInt(e.getMessage())]).append("\" at line ").append(lineCounter).append(".\n");
+                    System.out.println("Missing data in \"" + fileName + "\" for attribute \"" + attributes[Integer.parseInt(e.getMessage())] + "\" at line " + lineCounter + ".");
+                    exceptionsWriter.write("Missing data in \"" + fileName + "\" for attribute \"" + attributes[Integer.parseInt(e.getMessage())] + "\" at line " + lineCounter + ".\n");
                     continue;
                 }
 
-                fileWriter.write("<tr>");
+                fileWriter.write("<tr>\n");
 
                 for (String data : line) {
                     fileWriter.write("<td>" + data + "</td>\n");
@@ -204,29 +218,28 @@ public class Main {
                 fileWriter.write("</tr>\n");
 
                 if (!fileReader.hasNextLine()) fileWriter.write("</table>"); //Last line of table
-
             }
         }
 
         fileWriter.write("</body>\n</html>");
 
         fileWriter.close();
-
-        return dataMissingExceptions.toString();
     }
 
-    private static void writeAttributes(FileWriter fileWriter, String[] attributes, String fileName) throws CSVAttributeMissing, IOException {
-        fileWriter.write("<tr>");
+    private static void writeAttributes(FileWriter fileWriter, FileWriter exceptionsWriter, String[] attributes, String fileName) throws CSVAttributeMissing, IOException {
+        fileWriter.write("<tr>\n");
 
         for (String attribute : attributes) {
             if (attribute.isBlank()) {
                 System.out.println("ERROR: Missing attribute in \"" + fileName + "\". File has not been converted to html.");
+                exceptionsWriter.write("ERROR: Missing attribute in \"" + fileName + "\". File has not been converted to html.\n");
+                fileWriter.close();
                 throw new CSVAttributeMissing("ERROR: Missing attribute in \"" + fileName + "\". File has not been converted to html.");
             }
             fileWriter.write("<th>" + attribute + "</th>\n");
         }
 
-        fileWriter.write("</tr>");
+        fileWriter.write("</tr>\n");
     }
 
     private static void verifyDataRow(String[] line) throws CSVDataMissing {
