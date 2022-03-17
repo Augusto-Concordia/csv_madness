@@ -98,20 +98,17 @@ public class Main {
         }
         //All 3 files to be written to have been created or opened successfully
 
+        String dataMissingExceptions;
         try {
-            ConvertCSVtoHTML(covidStatsScanner, covidStatsWriter, exceptionsWriter);
+            dataMissingExceptions = ConvertCSVtoHTML(covidStatsScanner, covidStatsWriter, "covidStatistics.csv");
         } catch (CSVAttributeMissing e) {
-            e.printStackTrace();
-        } catch (CSVDataMissing e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
         }
         try {
-            ConvertCSVtoHTML(doctorListScanner, doctorListWriter, exceptionsWriter);
+            dataMissingExceptions = ConvertCSVtoHTML(doctorListScanner, doctorListWriter, "doctorList.csv");
         } catch (CSVAttributeMissing e) {
-            e.printStackTrace();
-        } catch (CSVDataMissing e) {
             e.printStackTrace();
         } catch (IOException e) {
             e.printStackTrace();
@@ -153,9 +150,7 @@ public class Main {
         }
     }
 
-    private static void ConvertCSVtoHTML(Scanner fileReader, FileWriter fileWriter, FileWriter exceptionsWriter) throws CSVAttributeMissing, CSVDataMissing, IOException {
-
-        final int NB_ATTRIBUTES = 4;
+    private static String ConvertCSVtoHTML(Scanner fileReader, FileWriter fileWriter, String fileName) throws CSVAttributeMissing, IOException {
 
         fileWriter.write("""
                 <!DOCTYPE html>
@@ -173,32 +168,70 @@ public class Main {
                 """);
 
         String[] line = fileReader.nextLine().split(",");
+        String[] attributes;
+        StringBuilder dataMissingExceptions = new StringBuilder(); //Contains all the missing data exceptions that will be added to Exceptions.log
+        int lineCounter = 1;
 
         fileWriter.write("<caption>" + line[0] + "</caption>");
 
-        line = fileReader.nextLine().split(",");
+        attributes = fileReader.nextLine().split(",");
+        lineCounter++;
+
+        writeAttributes(fileWriter, attributes, fileName);
+
+
+        while (fileReader.hasNextLine()) {
+            line = fileReader.nextLine().split(",");
+            lineCounter++;
+
+            if (!fileReader.hasNextLine() && line[0].startsWith("Note:")) { //Last line and it's a note
+                fileWriter.write("</table>\n<span>" + line[0] + "</span>\n");
+            } else {
+
+                try {
+                    verifyDataRow(line);
+                } catch (CSVDataMissing e) {
+                    dataMissingExceptions.append("Missing data in \"").append(fileName).append("\" for attribute \"").append(attributes[Integer.parseInt(e.getMessage())]).append("\" at line ").append(lineCounter).append(".\n");
+                    continue;
+                }
+
+                fileWriter.write("<tr>");
+
+                for (String data : line) {
+                    fileWriter.write("<td>" + data + "</td>\n");
+                }
+
+                fileWriter.write("</tr>\n");
+
+                if (!fileReader.hasNextLine()) fileWriter.write("</table>"); //Last line of table
+
+            }
+        }
+
+        fileWriter.write("</body>\n</html>");
+
+        fileWriter.close();
+
+        return dataMissingExceptions.toString();
+    }
+
+    private static void writeAttributes(FileWriter fileWriter, String[] attributes, String fileName) throws CSVAttributeMissing, IOException {
         fileWriter.write("<tr>");
 
-        for (String attribute : line) {
-            if (attribute.isBlank()) throw new CSVAttributeMissing(); //todo on ne connait pas le nom du fichier par le scanner, donc on va ecrire le msg personnalise dans main
+        for (String attribute : attributes) {
+            if (attribute.isBlank()) {
+                System.out.println("ERROR: Missing attribute in \"" + fileName + "\". File has not been converted to html.");
+                throw new CSVAttributeMissing("ERROR: Missing attribute in \"" + fileName + "\". File has not been converted to html.");
+            }
             fileWriter.write("<th>" + attribute + "</th>\n");
         }
 
-        while (fileReader.hasNextLine())
-        {
-            line = fileReader.nextLine().split(",");
-            fileWriter.write("<tr>");
+        fileWriter.write("</tr>");
+    }
 
-            for (String attribute : line) {
-                if (attribute.isBlank()) throw new CSVAttributeMissing(); //todo on ne connait pas le nom du fichier par le scanner, donc on va ecrire le msg personnalise dans main
-                fileWriter.write("<th>" + attribute + "</th>\n");
-            }
-
-            fileWriter.write("</tr>\n");
+    private static void verifyDataRow(String[] line) throws CSVDataMissing {
+        for (int i = 0; i < line.length; i++) {
+            if (line[i].isBlank()) throw new CSVDataMissing(String.valueOf(i));
         }
-
-        fileWriter.write("</table>\n </body>\n </html>");
-
-        fileWriter.close();
     }
 }
